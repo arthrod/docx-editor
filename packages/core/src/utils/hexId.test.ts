@@ -1,5 +1,15 @@
 import { describe, test, expect } from 'bun:test';
-import { generateHexId } from './hexId';
+import { generateHexId, MAX_HEX_ID_EXCLUSIVE } from './hexId';
+
+describe('MAX_HEX_ID_EXCLUSIVE', () => {
+  test('matches the strictest ST_LongHexNumber cap (durableId)', () => {
+    // Pins the constant so a future "let's bump it back to 0x80000000"
+    // diff is caught at review time. The value is the spec cap for
+    // w16cid:commentId/@durableId, which is the tightest of every
+    // field generateHexId feeds.
+    expect(MAX_HEX_ID_EXCLUSIVE).toBe(0x7fffffff);
+  });
+});
 
 describe('generateHexId', () => {
   test('always produces 8 uppercase hex characters', () => {
@@ -25,7 +35,7 @@ describe('generateHexId', () => {
 
   test('covers the full valid range up to (but not including) the cap', () => {
     // Stress the boundary: with 20 000 trials and a half-range uniform
-    // distribution, P(max < 0x40000000) ≈ 2.7e-2 700, so a passing
+    // distribution, P(max < 0x40000000) ≈ 2^-20000, so a passing
     // generator must produce at least one value in the upper half of
     // the valid range [0x40000000, 0x80000000).
     let sawUpperHalf = false;
@@ -34,5 +44,23 @@ describe('generateHexId', () => {
       if (v >= 0x40000000 && v < 0x80000000) sawUpperHalf = true;
     }
     expect(sawUpperHalf).toBe(true);
+  });
+
+  // Comment `durableId` (`w16cid:commentId/@durableId`) has a stricter
+  // cap of `< 0x7FFFFFFF` than paraId/textId. The supremum of
+  // `Math.random()` is `1 - 2^-52`; with a `0x80000000` multiplier this
+  // floors to `0x7FFFFFFF`, which equals the durableId cap and is
+  // therefore invalid. The fix tightens the multiplier to `0x7FFFFFFF`
+  // so the worst-case value floors to `0x7FFFFFFE`, satisfying every
+  // ST_LongHexNumber field.
+  test('worst-case Math.random() supremum stays under the durableId cap (< 0x7FFFFFFF)', () => {
+    const original = Math.random;
+    Math.random = () => 1 - Number.EPSILON;
+    try {
+      const value = parseInt(generateHexId(), 16);
+      expect(value).toBeLessThan(0x7fffffff);
+    } finally {
+      Math.random = original;
+    }
   });
 });
