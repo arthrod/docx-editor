@@ -1,5 +1,15 @@
 import { describe, test, expect } from 'bun:test';
-import { generateHexId } from './hexId';
+import { generateHexId, MAX_HEX_ID_EXCLUSIVE } from './hexId';
+
+describe('MAX_HEX_ID_EXCLUSIVE', () => {
+  test('matches the strictest ST_LongHexNumber cap (durableId)', () => {
+    // Pins the constant so a future "let's bump it back to 0x80000000"
+    // diff is caught at review time. The value is the spec cap for
+    // w16cid:commentId/@durableId, which is the tightest of every
+    // field generateHexId feeds.
+    expect(MAX_HEX_ID_EXCLUSIVE).toBe(0x7fffffff);
+  });
+});
 
 describe('generateHexId', () => {
   test('always produces 8 uppercase hex characters', () => {
